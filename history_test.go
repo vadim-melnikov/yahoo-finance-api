@@ -1,6 +1,7 @@
 package yahoofinanceapi
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -50,7 +51,7 @@ func TestTransformData(t *testing.T) {
 
 func TestTransformDataWithMinuteInterval(t *testing.T) {
 	history := newHistory()
-	q := HistoryQuery{Range: "1d", Interval: "1m"}
+	q := HistoryQuery{Range: "1d", Interval: "5m"} // Used 5m interval because caught zero values for 1m interval, i.e. interval=1m&period1=&period2=1772634964&range=1d
 	history.SetQuery(q)
 	resp, err := history.GetHistory("AAPL")
 	if err != nil {
@@ -63,6 +64,31 @@ func TestTransformDataWithMinuteInterval(t *testing.T) {
 	for _, data := range transformed {
 		if data.Close == 0 {
 			t.Error("transformData returned PriceData with zero Close")
+		}
+		if data.Currency != "USD" {
+			t.Error("transformData returned PriceData with incorrect Currency")
+		}
+	}
+}
+
+func TestTransformDataWithMinuteIntervalForNonUSMarket(t *testing.T) {
+	history := newHistory()
+	q := HistoryQuery{Range: "1d", Interval: "5m"}
+	history.SetQuery(q)
+	resp, err := history.GetHistory("BTO.TO")
+	if err != nil {
+		t.Fatalf("GetHistory returned error: %v", err)
+	}
+	transformed := history.transformData(resp)
+	if len(transformed) == 0 {
+		t.Error("transformData returned empty map")
+	}
+	for _, data := range transformed {
+		if data.Close == 0 {
+			t.Error("transformData returned PriceData with zero Close")
+		}
+		if data.Currency != "CAD" {
+			t.Error("transformData returned PriceData with incorrect Currency")
 		}
 	}
 }
@@ -107,5 +133,43 @@ func TestSetDefaultWithInvalidStartDate(t *testing.T) {
 	q.SetDefault()
 	if q.Start != "default" {
 		t.Error("SetDefault did not set Start to 'default' for invalid date")
+	}
+}
+
+func TestSetEndDate(t *testing.T) {
+	endString := "2026-02-28"
+	q := HistoryQuery{End: endString}
+	q.SetDefault()
+
+	tm, _ := time.Parse("2006-01-02", endString)
+	if q.End != fmt.Sprintf("%d", tm.Unix()) {
+		t.Error("SetDefault did not converted End date correctly")
+	}
+}
+
+func TestSetStartDate(t *testing.T) {
+	startDate := "2026-02-28"
+	q := HistoryQuery{Start: startDate}
+	q.SetDefault()
+
+	tm, _ := time.Parse("2006-01-02", startDate)
+	if q.Start != fmt.Sprintf("%d", tm.Unix()) {
+		t.Error("SetDefault did not converted Start date correctly")
+	}
+}
+
+func TestSetBothDates(t *testing.T) {
+	startDate := "2026-02-28"
+	endDate := "2026-03-03"
+	q := HistoryQuery{Start: startDate, End: endDate}
+	q.SetDefault()
+
+	tm, _ := time.Parse("2006-01-02", startDate)
+	tm2, _ := time.Parse("2006-01-02", endDate)
+	if q.Start != fmt.Sprintf("%d", tm.Unix()) {
+		t.Error("SetDefault did not converted Start date correctly")
+	}
+	if q.End != fmt.Sprintf("%d", tm2.Unix()) {
+		t.Error("SetDefault did not converted End date correctly")
 	}
 }

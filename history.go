@@ -76,11 +76,12 @@ type YahooQuote struct {
 }
 
 type PriceData struct {
-	Open   float64
-	High   float64
-	Low    float64
-	Close  float64
-	Volume int64
+	Open     float64
+	High     float64
+	Low      float64
+	Close    float64
+	Volume   int64
+	Currency string
 }
 
 type HistoryQuery struct {
@@ -109,6 +110,14 @@ func (hq *HistoryQuery) SetDefault() {
 	}
 	if hq.End == "" {
 		hq.End = fmt.Sprintf("%d", time.Now().Unix())
+	} else {
+		t, err := time.Parse("2006-01-02", hq.End)
+		if err != nil {
+			log.Printf("Failed to parse end date: %v\n", err)
+			hq.End = fmt.Sprintf("%d", time.Now().Unix())
+		} else {
+			hq.End = fmt.Sprintf("%d", t.Unix())
+		}
 	}
 	if hq.UserAgent == "" {
 		hq.UserAgent = USER_AGENTS[rand.Intn(len(USER_AGENTS))]
@@ -172,11 +181,12 @@ func (h *History) transformData(data YahooHistoryRespose) map[string]PriceData {
 			key = t.Format("2006-01-02 15:04:05")
 		}
 		d[key] = PriceData{
-			Open:   data.Chart.Result[0].Indicators.Quote[0].Open[i],
-			High:   data.Chart.Result[0].Indicators.Quote[0].High[i],
-			Low:    data.Chart.Result[0].Indicators.Quote[0].Low[i],
-			Close:  data.Chart.Result[0].Indicators.Quote[0].Close[i],
-			Volume: data.Chart.Result[0].Indicators.Quote[0].Volume[i],
+			Open:     data.Chart.Result[0].Indicators.Quote[0].Open[i],
+			High:     data.Chart.Result[0].Indicators.Quote[0].High[i],
+			Low:      data.Chart.Result[0].Indicators.Quote[0].Low[i],
+			Close:    data.Chart.Result[0].Indicators.Quote[0].Close[i],
+			Volume:   data.Chart.Result[0].Indicators.Quote[0].Volume[i],
+			Currency: data.Chart.Result[0].Meta.Currency,
 		}
 	}
 	return d
