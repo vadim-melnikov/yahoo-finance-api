@@ -160,7 +160,8 @@ func (h *History) GetHistory(symbol string) (YahooHistoryRespose, error) {
 
 	var historyResponse YahooHistoryRespose
 	if err := json.NewDecoder(resp.Body).Decode(&historyResponse); err != nil {
-		log.Fatalf("Failed to decode history data JSON response: %v", err)
+		slog.Error("Failed to decode history data JSON response", "err", err)
+		return YahooHistoryRespose{}, fmt.Errorf("failed to decode history data JSON response: %w", err)
 	}
 
 	if len(historyResponse.Chart.Result) == 0 {
