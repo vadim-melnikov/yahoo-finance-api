@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
@@ -22,7 +23,30 @@ type YahooChart struct {
 type YahooHistoryResult struct {
 	Meta       YahooMeta      `json:"meta"`
 	Timestamp  []int64        `json:"timestamp"`
+	Events     YahooEvents    `json:"events"`
 	Indicators YahooIndicator `json:"indicators"`
+}
+
+// YahooEvents holds the corporate events Yahoo returns when HistoryQuery.Events is set.
+// Yahoo keys each event by its timestamp.
+type YahooEvents struct {
+	Splits map[string]YahooSplitEvent `json:"splits"`
+}
+
+type YahooSplitEvent struct {
+	Date        int64   `json:"date"`
+	Numerator   float64 `json:"numerator"`
+	Denominator float64 `json:"denominator"`
+	SplitRatio  string  `json:"splitRatio"`
+}
+
+// Split is a stock split. A 4-for-1 split has Numerator 4 and Denominator 1,
+// a 1-for-10 reverse split has Numerator 1 and Denominator 10.
+type Split struct {
+	Date        time.Time // moment of the event, UTC
+	Numerator   float64
+	Denominator float64
+	Ratio       string // as Yahoo sent it, e.g. "4:1"
 }
 
 type YahooMeta struct {
@@ -90,6 +114,9 @@ type HistoryQuery struct {
 	Start     string
 	End       string
 	UserAgent string
+	// Events asks Yahoo for corporate events along with the prices, e.g. "split" or "div,split".
+	// Empty means no events are requested.
+	Events string
 }
 
 func (hq *HistoryQuery) SetDefault() {
@@ -137,18 +164,27 @@ func (h *History) SetQuery(query HistoryQuery) {
 	h.query = &query
 }
 
+// historyParams builds the v8/finance/chart query parameters from a query
+// that has already been through SetDefault.
+func historyParams(query *HistoryQuery) url.Values {
+	params := url.Values{}
+	if query.Range != "" {
+		params.Add("range", query.Range)
+	}
+	params.Add("interval", query.Interval)
+	params.Add("period1", query.Start)
+	params.Add("period2", query.End)
+	if query.Events != "" {
+		params.Add("events", query.Events)
+	}
+	return params
+}
+
 // returns the price/volume history of the given symbol as a YahooHistoryResponse
 // If you want to adjust the query range change h.query.Range = "6mo" for 6 month
 func (h *History) GetHistory(symbol string) (YahooHistoryRespose, error) {
 	h.query.SetDefault()
-
-	params := url.Values{}
-	if h.query.Range != "" {
-		params.Add("range", h.query.Range)
-	}
-	params.Add("interval", h.query.Interval)
-	params.Add("period1", h.query.Start)
-	params.Add("period2", h.query.End)
+	params := historyParams(h.query)
 
 	endpoint := fmt.Sprintf("%s/v8/finance/chart/%s", BASE_URL, symbol)
 	resp, err := h.client.Get(endpoint, params)
@@ -160,7 +196,8 @@ func (h *History) GetHistory(symbol string) (YahooHistoryRespose, error) {
 
 	var historyResponse YahooHistoryRespose
 	if err := json.NewDecoder(resp.Body).Decode(&historyResponse); err != nil {
-		log.Fatalf("Failed to decode history data JSON response: %v", err)
+		slog.Error("Failed to decode history data JSON response", "err", err)
+		return YahooHistoryRespose{}, fmt.Errorf("failed to decode history data JSON response: %w", err)
 	}
 
 	if len(historyResponse.Chart.Result) == 0 {
@@ -190,4 +227,25 @@ func (h *History) transformData(data YahooHistoryRespose) map[string]PriceData {
 		}
 	}
 	return d
+}
+
+// transformSplits returns the splits of the response in ascending date order.
+// A response without events gives an empty slice. A split with a non-positive
+// numerator or denominator is an error.
+func (h *History) transformSplits(data YahooHistoryRespose) ([]Split, error) {
+	events := data.Chart.Result[0].Events.Splits
+	splits := make([]Split, 0, len(events))
+	for key, event := range events {
+		if event.Numerator <= 0 || event.Denominator <= 0 {
+			return nil, fmt.Errorf("invalid split %s: numerator %v, denominator %v", key, event.Numerator, event.Denominator)
+		}
+		splits = append(splits, Split{
+			Date:        time.Unix(event.Date, 0).UTC(),
+			Numerator:   event.Numerator,
+			Denominator: event.Denominator,
+			Ratio:       event.SplitRatio,
+		})
+	}
+	sort.Slice(splits, func(i, j int) bool { return splits[i].Date.Before(splits[j].Date) })
+	return splits, nil
 }

@@ -45,6 +45,17 @@ func main() {
 	}
 	fmt.Println(history)
 
+	// history data with stock splits of the same period (prices are not adjusted)
+	prices, splits, err := t.HistoryWithSplits(yfa.HistoryQuery{Start: "2020-08-01", End: "2020-09-30"})
+	if err != nil {
+		fmt.Println("Error fetching history with splits:", err)
+		return
+	}
+	fmt.Println(len(prices))
+	for _, s := range splits {
+		fmt.Printf("%s %s (%v/%v)\n", s.Date.Format("2006-01-02"), s.Ratio, s.Numerator, s.Denominator)
+	}
+
 	// option chain
 	e := t.ExpirationDates()
 	oc := t.OptionChainByExpiration(e[2])

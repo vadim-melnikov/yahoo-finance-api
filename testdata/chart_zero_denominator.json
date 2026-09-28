@@ -1,0 +1,39 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "TEST",
+          "exchangeName": "NMS",
+          "instrumentType": "EQUITY",
+          "dataGranularity": "1d",
+          "range": ""
+        },
+        "timestamp": [1598880600],
+        "events": {
+          "splits": {
+            "1598880600": {
+              "date": 1598880600,
+              "numerator": 4,
+              "denominator": 0,
+              "splitRatio": "4:0"
+            }
+          }
+        },
+        "indicators": {
+          "quote": [
+            {
+              "open": [127.58],
+              "high": [131.0],
+              "low": [126.0],
+              "close": [129.04],
+              "volume": [225702700]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}
