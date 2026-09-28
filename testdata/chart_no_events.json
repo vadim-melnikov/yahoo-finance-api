@@ -1,0 +1,32 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "TEST",
+          "exchangeName": "NMS",
+          "instrumentType": "EQUITY",
+          "gmtoffset": -14400,
+          "timezone": "EDT",
+          "exchangeTimezoneName": "America/New_York",
+          "dataGranularity": "1d",
+          "range": ""
+        },
+        "timestamp": [1598880600, 1598967000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [127.58, 134.08],
+              "high": [131.0, 134.8],
+              "low": [126.0, 130.53],
+              "close": [129.04, 134.18],
+              "volume": [225702700, 151948100]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -90,6 +90,9 @@ type HistoryQuery struct {
 	Start     string
 	End       string
 	UserAgent string
+	// Events asks Yahoo for corporate events along with the prices, e.g. "split" or "div,split".
+	// Empty means no events are requested.
+	Events string
 }
 
 func (hq *HistoryQuery) SetDefault() {
@@ -137,18 +140,27 @@ func (h *History) SetQuery(query HistoryQuery) {
 	h.query = &query
 }
 
+// historyParams builds the v8/finance/chart query parameters from a query
+// that has already been through SetDefault.
+func historyParams(query *HistoryQuery) url.Values {
+	params := url.Values{}
+	if query.Range != "" {
+		params.Add("range", query.Range)
+	}
+	params.Add("interval", query.Interval)
+	params.Add("period1", query.Start)
+	params.Add("period2", query.End)
+	if query.Events != "" {
+		params.Add("events", query.Events)
+	}
+	return params
+}
+
 // returns the price/volume history of the given symbol as a YahooHistoryResponse
 // If you want to adjust the query range change h.query.Range = "6mo" for 6 month
 func (h *History) GetHistory(symbol string) (YahooHistoryRespose, error) {
 	h.query.SetDefault()
-
-	params := url.Values{}
-	if h.query.Range != "" {
-		params.Add("range", h.query.Range)
-	}
-	params.Add("interval", h.query.Interval)
-	params.Add("period1", h.query.Start)
-	params.Add("period2", h.query.End)
+	params := historyParams(h.query)
 
 	endpoint := fmt.Sprintf("%s/v8/finance/chart/%s", BASE_URL, symbol)
 	resp, err := h.client.Get(endpoint, params)
