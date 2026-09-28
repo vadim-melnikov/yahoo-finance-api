@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
@@ -22,7 +23,30 @@ type YahooChart struct {
 type YahooHistoryResult struct {
 	Meta       YahooMeta      `json:"meta"`
 	Timestamp  []int64        `json:"timestamp"`
+	Events     YahooEvents    `json:"events"`
 	Indicators YahooIndicator `json:"indicators"`
+}
+
+// YahooEvents holds the corporate events Yahoo returns when HistoryQuery.Events is set.
+// Yahoo keys each event by its timestamp.
+type YahooEvents struct {
+	Splits map[string]YahooSplitEvent `json:"splits"`
+}
+
+type YahooSplitEvent struct {
+	Date        int64   `json:"date"`
+	Numerator   float64 `json:"numerator"`
+	Denominator float64 `json:"denominator"`
+	SplitRatio  string  `json:"splitRatio"`
+}
+
+// Split is a stock split. A 4-for-1 split has Numerator 4 and Denominator 1,
+// a 1-for-10 reverse split has Numerator 1 and Denominator 10.
+type Split struct {
+	Date        time.Time // moment of the event, UTC
+	Numerator   float64
+	Denominator float64
+	Ratio       string // as Yahoo sent it, e.g. "4:1"
 }
 
 type YahooMeta struct {
@@ -203,4 +227,25 @@ func (h *History) transformData(data YahooHistoryRespose) map[string]PriceData {
 		}
 	}
 	return d
+}
+
+// transformSplits returns the splits of the response in ascending date order.
+// A response without events gives an empty slice. A split with a non-positive
+// numerator or denominator is an error.
+func (h *History) transformSplits(data YahooHistoryRespose) ([]Split, error) {
+	events := data.Chart.Result[0].Events.Splits
+	splits := make([]Split, 0, len(events))
+	for key, event := range events {
+		if event.Numerator <= 0 || event.Denominator <= 0 {
+			return nil, fmt.Errorf("invalid split %s: numerator %v, denominator %v", key, event.Numerator, event.Denominator)
+		}
+		splits = append(splits, Split{
+			Date:        time.Unix(event.Date, 0).UTC(),
+			Numerator:   event.Numerator,
+			Denominator: event.Denominator,
+			Ratio:       event.SplitRatio,
+		})
+	}
+	sort.Slice(splits, func(i, j int) bool { return splits[i].Date.Before(splits[j].Date) })
+	return splits, nil
 }

@@ -73,6 +73,23 @@ func (t *Ticker) History(query HistoryQuery) (map[string]PriceData, error) {
 	return t.history.transformData(history), nil
 }
 
+// HistoryWithSplits is History plus the stock splits of the same period, in ascending date order.
+// It sets query.Events to "split" itself; History is not affected.
+// Prices are returned as Yahoo sends them: applying the splits is up to the caller.
+func (t *Ticker) HistoryWithSplits(query HistoryQuery) (map[string]PriceData, []Split, error) {
+	query.Events = "split"
+	t.history.SetQuery(query)
+	history, err := t.history.GetHistory(t.Symbol)
+	if err != nil {
+		return nil, nil, err
+	}
+	splits, err := t.history.transformSplits(history)
+	if err != nil {
+		return nil, nil, err
+	}
+	return t.history.transformData(history), splits, nil
+}
+
 // OptionChain retrieves the option chain for the Ticker's symbol.
 // It returns an OptionData struct containing the options available for the ticker.
 // If no options are found, it returns an empty OptionData struct.

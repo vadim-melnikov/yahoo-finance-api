@@ -1,0 +1,48 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "TEST",
+          "exchangeName": "NMS",
+          "instrumentType": "EQUITY",
+          "gmtoffset": -18000,
+          "timezone": "EST",
+          "exchangeTimezoneName": "America/New_York",
+          "dataGranularity": "1d",
+          "range": ""
+        },
+        "timestamp": [1598621400, 1598880600, 1609770600],
+        "events": {
+          "splits": {
+            "1609770600": {
+              "date": 1609770600,
+              "numerator": 1,
+              "denominator": 10,
+              "splitRatio": "1:10"
+            },
+            "1598880600": {
+              "date": 1598880600,
+              "numerator": 4,
+              "denominator": 1,
+              "splitRatio": "4:1"
+            }
+          }
+        },
+        "indicators": {
+          "quote": [
+            {
+              "open": [126.01, 127.58, 1330.0],
+              "high": [126.44, 131.0, 1336.4],
+              "low": [124.58, 126.0, 1270.6],
+              "close": [124.81, 129.04, 1295.2],
+              "volume": [187630000, 225702700, 14350000]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 )
 
 // newOfflineServer starts an httptest.Server that answers every request with body
@@ -100,5 +101,95 @@ func TestGetHistoryMalformedJSONOffline(t *testing.T) {
 	_, err := history.GetHistory("TEST")
 	if err == nil {
 		t.Fatal("Expected error for malformed JSON, got nil")
+	}
+}
+
+func TestHistoryWithSplitsOffline(t *testing.T) {
+	lastQuery := newOfflineServer(t, readFixture(t, "chart_with_splits.json"))
+
+	ticker := NewTicker("TEST")
+	prices, splits, err := ticker.HistoryWithSplits(HistoryQuery{Start: "2020-08-01", End: "2021-01-31"})
+	if err != nil {
+		t.Fatalf("HistoryWithSplits returned error: %v", err)
+	}
+	if got := lastQuery().Get("events"); got != "split" {
+		t.Errorf("Expected events parameter %q, got %q", "split", got)
+	}
+	if len(prices) != 3 {
+		t.Errorf("Expected 3 prices, got %d", len(prices))
+	}
+
+	want := []Split{
+		{Date: time.Date(2020, 8, 31, 13, 30, 0, 0, time.UTC), Numerator: 4, Denominator: 1, Ratio: "4:1"},
+		{Date: time.Date(2021, 1, 4, 14, 30, 0, 0, time.UTC), Numerator: 1, Denominator: 10, Ratio: "1:10"},
+	}
+	if len(splits) != len(want) {
+		t.Fatalf("Expected %d splits, got %d: %+v", len(want), len(splits), splits)
+	}
+	for i, s := range splits {
+		if !s.Date.Equal(want[i].Date) || s.Numerator != want[i].Numerator ||
+			s.Denominator != want[i].Denominator || s.Ratio != want[i].Ratio {
+			t.Errorf("Split %d: expected %+v, got %+v", i, want[i], s)
+		}
+		if s.Date.Location() != time.UTC {
+			t.Errorf("Split %d: expected Date in UTC, got %v", i, s.Date.Location())
+		}
+	}
+}
+
+func TestHistoryWithSplitsNoEventsOffline(t *testing.T) {
+	newOfflineServer(t, readFixture(t, "chart_no_events.json"))
+
+	ticker := NewTicker("TEST")
+	prices, splits, err := ticker.HistoryWithSplits(HistoryQuery{Start: "2020-08-01", End: "2020-09-30"})
+	if err != nil {
+		t.Fatalf("HistoryWithSplits returned error: %v", err)
+	}
+	if splits == nil || len(splits) != 0 {
+		t.Errorf("Expected an empty, non-nil slice of splits, got %#v", splits)
+	}
+	if len(prices) != 2 {
+		t.Errorf("Expected 2 prices, got %d", len(prices))
+	}
+}
+
+func TestHistoryWithSplitsZeroDenominatorOffline(t *testing.T) {
+	newOfflineServer(t, readFixture(t, "chart_zero_denominator.json"))
+
+	ticker := NewTicker("TEST")
+	_, _, err := ticker.HistoryWithSplits(HistoryQuery{Start: "2020-08-01", End: "2020-09-30"})
+	if err == nil {
+		t.Error("Expected error for a split with a zero denominator, got nil")
+	}
+}
+
+func TestHistoryDoesNotRequestEventsOffline(t *testing.T) {
+	lastQuery := newOfflineServer(t, readFixture(t, "chart_with_splits.json"))
+
+	ticker := NewTicker("TEST")
+	if _, _, err := ticker.HistoryWithSplits(HistoryQuery{Start: "2020-08-01", End: "2021-01-31"}); err != nil {
+		t.Fatalf("HistoryWithSplits returned error: %v", err)
+	}
+	if _, err := ticker.History(HistoryQuery{Start: "2020-08-01", End: "2021-01-31"}); err != nil {
+		t.Fatalf("History returned error: %v", err)
+	}
+	if lastQuery().Has("events") {
+		t.Errorf("Expected History to send no events parameter, got %q", lastQuery().Get("events"))
+	}
+}
+
+func TestTransformSplitsRejectsZeroParts(t *testing.T) {
+	events := []YahooSplitEvent{
+		{Date: 1598880600, Numerator: 0, Denominator: 1, SplitRatio: "0:1"},
+		{Date: 1598880600, Numerator: 4, Denominator: 0, SplitRatio: "4:0"},
+	}
+	history := newHistory()
+	for _, event := range events {
+		data := YahooHistoryRespose{Chart: YahooChart{Result: []YahooHistoryResult{{
+			Events: YahooEvents{Splits: map[string]YahooSplitEvent{"1598880600": event}},
+		}}}}
+		if _, err := history.transformSplits(data); err == nil {
+			t.Errorf("Expected error for split %q, got nil", event.SplitRatio)
+		}
 	}
 }

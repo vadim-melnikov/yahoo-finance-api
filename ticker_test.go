@@ -106,3 +106,25 @@ func TestExpirationDates(t *testing.T) {
 		t.Error("ExpirationDates returned empty slice")
 	}
 }
+
+func TestHistoryWithSplitsValidSymbol(t *testing.T) {
+	ticker := NewTicker("AAPL")
+	query := HistoryQuery{Start: "2020-08-01", End: "2020-09-30", Interval: "1d"}
+	data, splits, err := ticker.HistoryWithSplits(query)
+	if err != nil {
+		t.Fatalf("HistoryWithSplits returned error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Error("HistoryWithSplits returned empty map for valid symbol")
+	}
+	if len(splits) != 1 {
+		t.Fatalf("Expected 1 split, got %d: %+v", len(splits), splits)
+	}
+	s := splits[0]
+	if s.Numerator != 4 || s.Denominator != 1 || s.Ratio != "4:1" {
+		t.Errorf("Expected a 4:1 split, got %+v", s)
+	}
+	if s.Date.Format("2006-01-02") != "2020-08-31" {
+		t.Errorf("Expected split date 2020-08-31, got %s", s.Date.Format("2006-01-02"))
+	}
+}
